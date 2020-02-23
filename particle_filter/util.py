@@ -15,3 +15,8 @@ def drawEllipse(img, pos):
     theta = 0
     pos = (int(pos[0]), int(pos[1])) # ellipse cant handle floats
     cv.ellipse(img, pos, (w,h), theta, 0, 360, 255, thickness=size)
+
+def drawCircle(img, pos):
+    r = 4
+    pos = (int(pos[0]), int(pos[1])) # ellipse cant handle floats
+    cv.circle(img, pos, r, (255,255,255), -1)
