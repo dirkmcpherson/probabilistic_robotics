@@ -7,10 +7,12 @@ from IPython import embed
 class Map(object):
     resolution = 50 #pixels per distance unit
     scale_percent = 30.
+    sample_width = 26
     def __init__(self, img_path="./MarioMap.png", scale=100):
         self.scale_percent = scale / 100.
         self.original_image = cv.imread(img_path, cv.IMREAD_COLOR)
         self.image = util.scaleImage(self.original_image, scale)
+        self.original_image = util.scaleImage(self.original_image, scale)
 
         rows,cols,colorDim = self.image.shape
         self.imageWidth = cols
@@ -29,7 +31,8 @@ class Map(object):
 
     def inBounds(self, pos_pixel):
         x,y = pos_pixel
-        return (x > 0 and y > 0 and x < self.imageWidth and y < self.imageHeight)
+        buffer = self.sample_width / 2.
+        return (x > buffer and y > buffer and x < (self.imageWidth - buffer) and y < (self.imageHeight - buffer))
 
     def sample_box(self, position, sample_resolution=26, draw=False):
         x,y = self.positionToPixel(position)
@@ -45,7 +48,7 @@ class Map(object):
         return box
 
 
-    def sample(self, position, sample_resolution=128): # make sample resolution even ALWAYS
+    def sample(self, position, sample_resolution=26): # make sample resolution even ALWAYS
         x,y = self.positionToPixel(position)
         box = self.sample_box(position, sample_resolution=sample_resolution)
         
@@ -60,7 +63,7 @@ class Map(object):
             # embed()
             subset = self.image[miny:miny+int(sample_resolution), minx:minx+sample_resolution]
         
-        print(subset)
+        # print(subset)
         return subset
 
     def showSample(self, pixel_position):
@@ -74,6 +77,10 @@ class Map(object):
         cv.imshow('image',img)
         # cv.waitKey(0)
         # cv.destroyAllWindows()
+
+    def clearImage(self):
+        self.image = cv.imread("./MarioMap.png", cv.IMREAD_COLOR)
+        self.image = util.scaleImage(self.image, 100 * self.scale_percent)
 
     def mark(self, pos_pixel, color='red'):
         pass

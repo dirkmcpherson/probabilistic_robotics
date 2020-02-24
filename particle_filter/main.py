@@ -4,12 +4,17 @@ import util
 from IPython import embed
 from map import Map
 from drone import Drone 
+from particle_filter import Particle, ParticleFilter
 
 imagePath = "./MarioMap.png"
 
 def main():
     m = Map(imagePath, scale=25)
     d = Drone(m)
+    pf = ParticleFilter(m, d)
+
+    pf.calculateLikelihood()
+    pf.drawParticles()
 
     finish = False
     sampleWidth = 216
@@ -18,6 +23,7 @@ def main():
         # m.sample_box(d.pos, sample_resolution=sampleWidth, draw=True)
         util.drawCircle(m.image, m.positionToPixel(d.pos))
         m.show()
+        m.clearImage()
         # cv.imshow('image', m.sample(d.pos, sample_resolution=sampleWidth))
         key = cv.waitKey(0)
         if (key == ord('q')):
@@ -33,6 +39,9 @@ def main():
         elif (key == 13): #enter
             dp = d.generateRandomMovementVector()
             d.move(dp)
+            pf.motionUpdate(dp)
+            pf.measurementUpdate()
+            pf.drawParticles()
         else:
             print("Unrecognized key")
 
