@@ -6,7 +6,7 @@ from particle_filter import Particle
 from IPython import embed
 
 class Drone(Particle):
-    stdev = 0.2
+    stdev = 0.1
     def __init__(self, map):
         super()
         self.map = map
@@ -22,7 +22,7 @@ class Drone(Particle):
 
         newPos = (self.pos[0] + nx, self.pos[1] + ny)
         newPos_pixel = self.map.positionToPixel(newPos)
-        if (self.map.inBounds(newPos_pixel)):
+        if (self.map.inBounds_pixel(newPos_pixel)):
             self.pos = newPos
         else:
             print("Drone noise took it out of bounds. Ignored Noise.")

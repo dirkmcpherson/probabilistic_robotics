@@ -1,4 +1,5 @@
 import cv2 as cv
+import numpy as np
 
 def scaleImage(img, scale_percent):
     width = int(img.shape[1] * scale_percent / 100)
@@ -20,3 +21,10 @@ def drawCircle(img, pos, color=(255,255,255)):
     r = 4
     pos = (int(pos[0]), int(pos[1])) # ellipse cant handle floats
     cv.circle(img, pos, r, color, -1)
+
+def dp(p0, p1):
+    return (p0[0] - p1[0], p0[1] - p1[1])
+
+def distance(p0, p1):
+    dx, dy = dp(p0,p1)
+    return np.sqrt(dx**2 + dy**2)

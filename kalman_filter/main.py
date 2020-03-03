@@ -116,6 +116,7 @@ class KalmanFilter:
         self.ut = np.zeros(2*Dimensions) # control command (none)
         self.noiseMean = np.zeros(2 * Dimensions) # position and velocity for n-dimensions
         self.covariance = np.identity(2*Dimensions) # nxn where n is the number of state variables
+        # self.covariance = np.zeros(2*Dimensions) # nxn where n is the number of state variables
         self.Kalman_gains = []
 
     def position(self):
@@ -131,6 +132,7 @@ class KalmanFilter:
         controlUpdate = np.matmul(B, self.ut)
         mean = stateUpdate + controlUpdate + np.random.multivariate_normal(self.noiseMean, R)
         covariance = ABA_T(A, self.covariance) + R
+        print(covariance)
 
         return mean, covariance
 
@@ -329,7 +331,7 @@ def p2_2():
     plt.ylabel("velocity")
     plt.xlabel("position")
     plt.title("1D State Distribution")
-    # plt.show()
+    plt.show()
 
 def p2_3():
     p_fail = [0.1, 0.5, 0.9]
@@ -358,7 +360,7 @@ def p2_3():
 
                 error = abs(gt.position() - kf.position())
                 print("error", error)
-                allError[n].append(error[0])
+                allError[n].append(error)
 
         # embed()
             
@@ -480,7 +482,7 @@ if __name__ == "__main__":
     import sys
     if (len(sys.argv) > 1):
         DEBUG = sys.argv[1]
-    main()
+    # main()
     # p1_3()
     # p2_2()
-    # p2_3()
+    p2_3()
