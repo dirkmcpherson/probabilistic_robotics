@@ -7,8 +7,10 @@ from drone import Drone
 from particle_filter import Particle, ParticleFilter
 import time
 import util
+import matplotlib.pyplot as plt
 
-imagePath = "./BayMap.png"
+imagePath = "./CityMap.png" #
+imagePath ="./MarioMap.png" #"./BayMap.png"
 def main(DEBUG=False):
     m = Map(imagePath, scale=100, sampleResolution=26)
     d = Drone(m)
@@ -24,12 +26,7 @@ def main(DEBUG=False):
     while not finish:
         update=False
         dp = (0,0)
-        # m.sample_box(d.pos, sample_resolution=sampleWidth, draw=True)
-
-        drone_pos_pixel = m.positionToPixel(d.pos)
-        drone_pos_map = m.pixelToPosition(drone_pos_pixel)
-        util.drawCircle(m.image, m.positionToPixel(drone_pos_map))
-        # util.drawCircle(m.image, m.positionToPixel(d.pos))
+        util.drawCircle(m.image, m.positionToPixel(d.pos))
         m.show()
         m.clearImage()
         # cv.imshow('image', m.sample(d.pos, sample_resolution=sampleWidth))
@@ -65,39 +62,68 @@ def main(DEBUG=False):
             [print("{:01.2f} : {:01.2f}".format(p.pos[0],p.pos[1])) for p in pf.particles]
             print("distance: ", distance)
 
-            # d_s = m.sample(d.pos)
-            # m.show(d_s,'baseline')
-            # cv.waitKey(0)
-            # for i in range(4):
-            #     xoffset = 0.05 * i
-            #     for j in range(4):
-            #         yoffset = 0.05*j
+        pf.fullUpdate(dp)
 
-            #         p = Particle(m)
-            #         p.pos = (d.pos[0]+xoffset, d.pos[1]+yoffset)
-            #         p_s = m.sample(p.pos)
-            #         print("Difference ", pf.comparisonFunction(d_s, p_s))
-            #         m.show(p_s)
-            #         cv.waitKey(0)
+# Basic run
+def generateDataPoint1(nP, resampleRate, numIterations, headless):
+    ret = []
+    m = Map(imagePath, scale=100, sampleResolution=26)
+    d = Drone(m)
+    pf = ParticleFilter(m, d, numParticles=nP, resampleRate=resampleRate)
+    pf.calculateLikelihood()
+
+    for i in range(numIterations):
+        dp = d.generateRandomMovementVector_map()
+        d.move(dp)
+        pf.fullUpdate(dp)
+
+        # ret.append(pf.averageParticleDistance(d.pos))
+        ret.append(pf.numParticlesClusteredAroundGroundTruth(d.pos))
+
+        if not headless:
+            m.clearImage()
+            pf.drawParticles()
+            util.drawCircle(m.image, m.positionToPixel(d.pos))
+            m.show()
+            key = cv.waitKey(0)
+
+    return ret
 
 
-        # # if (update):
-        # # t0 = time.time()
-        # print("numP ", len(pf.particles))
-        # # print("t0 ", time.time() - t0)
-        # # print("t1 ", time.time() - t0)
-        pf.motionUpdate(dp)
-        # # print("t2 ", time.time() - t0)
-        pf.measurementUpdate()
-        # # print("t3 ", time.time() - t0)
-        # # print("t4 ", time.time() - t0)
-        pf.drawParticles()
-            
+def runExperiment1(numParticles=1000, experimentalRuns=5, iterationsPerRun=10, resampleRate=0.0, headless=True):
+    y = []
+    for i in range(experimentalRuns):
+        print("Run ", i)
+        y.append(generateDataPoint1(numParticles, resampleRate, iterationsPerRun, headless))
 
-        # box = m.sample_box(d.pos)
-        # box = np.array(box, np.int32)
-        # cv.polylines(m.image, [box], True, (255,255,255), 3)
-        # Finish = True
+
+    # average the results of each run
+    y = np.array(y)
+    y = np.mean(y, 0)
+
+    x = [i for i in range(len(y))]
+    # plt.plot(x,y)
+    # plt.title("Particle distance from Drone over time. Averaged {} runs with {} particles.".format(experimentalRuns, numParticles))
+    # plt.xlabel("Particle Filter Update")
+    # plt.ylabel("Average Distance between Particle and Drone")
+    # plt.show()
+
+    return x,y
 
 if __name__ == "__main__":
-    main(DEBUG=True)
+    # main(DEBUG=True) 
+    runs=20
+    iterations=25
+    numParticles = 1000
+    x,y = runExperiment1(numParticles, runs, iterations, resampleRate=0.0, headless=True)
+    x0,y0 = runExperiment1(numParticles, runs, iterations, resampleRate=0.1, headless=True)
+    x1,y1 = runExperiment1(numParticles, runs, iterations, resampleRate=0.2, headless=True)
+
+    plt.plot(x,y,x0,y0,x1,y1)
+    plt.legend(["No resample","10% resample", "20% resample"])
+    plt.xlabel("Particle Filter Update")
+    plt.title("Particles Close to Drone. Averaged {} runs with {} particles.".format(runs, numParticles))
+    plt.ylabel("Particles within 1 unit of Drone")
+    # plt.title("Particle distance from Drone over time. Averaged {} runs with {} particles.".format(runs, numParticles))
+    # plt.ylabel("Average Distance between Particle and Drone")
+    plt.show()

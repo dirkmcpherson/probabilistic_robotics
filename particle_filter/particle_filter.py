@@ -55,23 +55,19 @@ class Particle(object):
     def jostle(self):
         self.pos = (self.pos[0] + np.random.normal(0,0.03), self.pos[1] + np.random.normal(0,0.03))
         jostledPos = (self.pos[0] + np.random.normal(0,0.03), self.pos[1] + np.random.normal(0,0.03))
-        # print("B- {:01.2f}, {:01.2f}".format(jostledPos[0],jostledPos[1]))
         jostled_pixel = self.map.positionToPixel(jostledPos)
-        # print("C- {:01.2f}, {:01.2f}".format(jostledPos_pixel[0],jostledPos_pixel[1]))
         jostled_pixel = self.capPixelPosition(jostled_pixel)
-        # print("D- {:01.2f}, {:01.2f}".format(jostledPos[0],jostledPos[1]))
         self.pos = self.map.pixelToPosition(jostled_pixel)
         
 
 class ParticleFilter(object):
-    totalExistingParticles = 0
     particles = []
     dispersalStdev = 0.2
 
-    def __init__(self, map, agent, numParticles=100):
+    def __init__(self, map, agent, numParticles=100, resampleRate=0.0):
+        self.randomResample = resampleRate
         self.numParticles = numParticles
         self.particles = [Particle(map) for _ in range(self.numParticles)]
-        self.totalExistingParticles += len(self.particles)
         self.map = map
         self.agent = agent
 
@@ -93,88 +89,28 @@ class ParticleFilter(object):
 
         diff = cv.compareHist(a,b,compType)
 
-        # all ones is best, all -1s is worst. -3 = 0, 3 = 1
-        # for d in diffs:
-        #     if d < 0:
-        #         print("ERROR: FUNCTION IS NOT DOING WHAT YOU THINK")
-
-        # totalDifference = sum(diffs) # move range to (0,6)
-
-        # self.map.show(measurement, 'p')
-        # self.map.show(expected_measurement, 'd')
-        # print(1-diff)
-        # cv.waitKey(0)
-
         ret = (1 - diff)
         if (compType == 3):
             return ret if ret > 0.0001 else 0.0001
         else:
             return diff
-
-    # def comparisonFunction(self, measurement, expected_measurement):
-    #     # straight up compare color (unbinned)
-    #     maxDifference = 255 * 26 * 26 # A black image compared to a white image
-
-    #     measurement = measurement.astype('int8')
-    #     expected_measurement = expected_measurement.astype('int8')
-    #     diffs = []
-    #     channels = [0,1,2]
-    #     for ch in channels:
-    #         diffs.append(np.sum(np.abs(measurement[:,:,ch] - expected_measurement[:,:,ch])))
-
-
-    #     # best case is diff is 0
-    #     # diff = sum(diffs)
-    #     # differenceRatio = diff / (3*maxDifference)
-
-    #     diff = max(diffs)
-    #     differenceRatio = diff / maxDifference
-
-    #     return 1 - differenceRatio
         
 
     def calculateLikelihood(self):
         actual_measurement = self.map.sample(self.agent.pos)
-
-        # for p in self.particles:
-        #     expected_measurement = self.map.sample(p.pos)
-        #     cv.imshow('actual', actual_measurement)
-        #     cv.waitKey(0)
-        #     cv.imshow('{}'.format(self.comparisonFunction(actual_measurement, expected_measurement)), expected_measurement)
-        #     cv.waitKey(0)
-        # return
-
-        # weights = []
-        # for p in self.particles:
-        #     try:
-        #         weights.append(self.comparisonFunction(actual_measurement, self.map.sample(p.pos)))
-        #     except:
-        #         embed()
-        #         return
-
-        # embed()
-        # time.sleep(10)
         weights = [self.comparisonFunction(actual_measurement, self.map.sample(p.pos)) for p in self.particles]
         weightTotal = np.sum(weights)
-        print(weights)
         weights = [w/weightTotal for w in weights]
         p = list(zip(weights, self.particles))
         p.sort(reverse=True, key=lambda p: p[0]) # sort by probability
 
         return p
 
-        # for entry in p:
-        #     if entry[0] > 0.9:
-        #         entry[1].color = (0,255,255)
-        #     print(entry)
-
-
-    randomResample = 0.0
     def measurementUpdate(self):
         ps = self.calculateLikelihood()
 
-        for p in ps:
-            print("{:01.2f} : {}".format(p[0],p[1].pos))
+        # for p in ps:
+        #     print("{:01.2f} : {}".format(p[0],p[1].pos))
 
         # resample based on liklihood (move low probability particles to high prob locations)
         # take the cumulative sum of the weights for resampling
@@ -191,23 +127,6 @@ class ParticleFilter(object):
                     sampledP.pos = ps[idx][1].pos
                     sampledParticles.append(sampledP) # grab the particle
                     break
-
-        # Fast but leaks particles
-        # idx = 0
-        # # d_sample = self.map.sample(self.agent.pos)
-        # # self.map.show(d_sample,"agent")
-        # while (len(sampledParticles) < 0.9*len(self.particles)):
-        #     p = Particle(self.map)
-        #     weight, particle = ps[idx]
-        #     p.pos = particle.pos
-        #     numTimesSampled = int(np.ceil(weight * len(self.particles)))
-        #     # p_sample = self.map.sample(p.pos)
-        #     # print("diff: ", self.comparisonFunction(d_sample, p_sample))
-        #     # print("Weight: ", weight)
-        #     # self.map.show(p_sample,"resample")
-        #     # cv.waitKey(0)
-        #     [sampledParticles.append(p) for i in range(numTimesSampled)]
-        #     idx = idx + 1
 
 
         self.particles = sampledParticles
@@ -234,6 +153,25 @@ class ParticleFilter(object):
 
         [util.drawCircle(img, self.map.positionToPixel(p.pos), p.color) for p in self.particles]
 
+    # calc the distance of every particle from the ground truth
+    def averageParticleDistance(self, groundTruth):
+        # only care about the non-resamples particles
+        distance = [util.distance(p.pos, groundTruth) for p in self.particles]
+        distance = sorted(distance) # ascending order (closest->furthest)
+        includedSamples = len(self.particles) * (1-self.randomResample)
+        toIdx = int(np.ceil(includedSamples)-1)
+        return np.mean(distance[0:toIdx])
+    
+    def numParticlesClusteredAroundGroundTruth(self, groundTruth):
+        distance = [util.distance(p.pos, groundTruth) for p in self.particles]
+        distance = [d for d in distance if d < 1]
+        return len(distance)
+
+
+    def fullUpdate(self, movementVector):
+        self.motionUpdate(movementVector)
+        self.measurementUpdate()
+        self.drawParticles()
     
 
 
